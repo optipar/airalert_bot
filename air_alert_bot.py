@@ -8,7 +8,7 @@ from datetime import datetime
 CHECK_INTERVAL = 60
 
 # 🔐 Змінні оточення
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 
 bot = Bot(token=BOT_TOKEN)
