@@ -1,32 +1,40 @@
 import os
-import threading
-from flask import Flask
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from telegram import Update
+import time
+import requests
+from telegram import Bot
 
-# === Flask для Render ===
-app = Flask(__name__)
+# Читання змінних середовища
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
-@app.route('/')
-def home():
-    return "Air Alert Bot is running."
+bot = Bot(token=BOT_TOKEN)
 
-def run_flask():
-    app.run(host="0.0.0.0", port=10000)
+# Ініціалізація збереженого стану
+last_state = None
 
-# === Telegram-бот ===
+def check_alerts():
+    try:
+        url = "https://alerts.com.ua/api/states"
+        response = requests.get(url)
+        data = response.json()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # Зберігай токен в ENV-перемінній у Render
+        # Отримати список областей, де тривога
+        active = [region['name'] for region in data if region['alert']]
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привіт! Бот працює та слухає повітряні тривоги.")
+        if active:
+            return f"🚨 Повітряна тривога у: {', '.join(active)}"
+        else:
+            return "✅ Все спокійно."
+    except Exception as e:
+        return f"❌ Помилка при перевірці тривог: {e}"
 
-def run_telegram_bot():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.run_polling()
-
-# === Запуск ===
-if __name__ == '__main__':
-    threading.Thread(target=run_flask).start()
-    run_telegram_bot()
+while True:
+    try:
+        message = check_alerts()
+        if message != last_state:
+            bot.send_message(chat_id=CHAT_ID, text=message)
+            last_state = message
+    except Exception as e:
+        print(f"Помилка при надсиланні повідомлення: {e}")
+    
+    time.sleep(60)  # Чекати 60 сек перед новою перевіркою
