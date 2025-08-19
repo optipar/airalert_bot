@@ -11,7 +11,7 @@ CHAT_ID = os.getenv("CHAT_ID")  # ID або @назва_каналу
 bot = Bot(token=BOT_TOKEN)
 
 # URL API
-REGIONS_API_URL = "https://alerts.com.ua/api/regions"
+REGIONS_API_URL = "https://alerts.com.ua/api/states"
 MAP_IMAGE_URL = "https://alerts.in.ua/static/img/map.png"
 
 # Стан останнього повідомлення
