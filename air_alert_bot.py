@@ -1,98 +1,73 @@
-import os
 import asyncio
-import logging
 import aiohttp
-from datetime import datetime
+import os
+from flask import Flask
 from telegram import Bot
+from datetime import datetime
 
-# Змінні середовища
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 
-# Логи
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+app = Flask(__name__)
+bot = Bot(token=BOT_TOKEN)
 
-# API
-API_URL = "https://alerts.com.ua/api/states"
-UPDATE_INTERVAL = 60  # перевірка кожні 60 секунд
+API_URL = "https://alerts.com.ua/api/states"  # актуальна перевірена API
+CHECK_INTERVAL = 60  # секунд
 
-# Словник для збереження попереднього стану
-previous_state = {}
+last_alerts = set()
 
-async def fetch_data():
+
+async def fetch_alerts():
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(API_URL) as response:
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    logger.error(f"❌ Помилка HTTP: {response.status}")
-                    return None
+                if response.status != 200:
+                    raise Exception(f"Помилка при отриманні даних: {response.status}")
+                return await response.json()
     except Exception as e:
-        logger.error(f"❌ Помилка при запиті до API: {e}")
+        await bot.send_message(chat_id=CHANNEL_ID, text=f"❌ Помилка при перевірці тривог: {e}")
         return None
 
-def parse_alerts(data):
-    if not isinstance(data, dict):
-        raise ValueError(f"Очікувався dict, отримано: {type(data)}")
 
-    alerts = []
-    for region_code, info in data.items():
-        if not isinstance(info, dict):
-            continue
+def format_alert_message(regions):
+    now = datetime.now().strftime("%H:%M:%S")
+    regions_str = ', '.join(regions)
+    return f"🚨 Повітряна тривога у: {regions_str} ⏰ {now}"
 
-        name = info.get("name")
-        alert = info.get("alert", False)
 
-        if name and alert:
-            alerts.append(name)
+async def check_alerts():
+    global last_alerts
+    data = await fetch_alerts()
+    if not data:
+        return
 
-    return alerts
+    active_regions = [region["name"] for region in data if region.get("active")]
 
-async def send_message(bot: Bot, message: str):
-    try:
-        await bot.send_message(chat_id=CHANNEL_ID, text=message)
-    except Exception as e:
-        logger.error(f"❌ Помилка при надсиланні повідомлення: {e}")
+    if set(active_regions) != last_alerts:
+        last_alerts = set(active_regions)
+        if active_regions:
+            msg = format_alert_message(active_regions)
+        else:
+            msg = "✅ Всі області спокійні"
+        await bot.send_message(chat_id=CHANNEL_ID, text=msg)
 
-async def main_loop():
-    global previous_state
-    bot = Bot(token=BOT_TOKEN)
-    logger.info("🚀 Бот запущено!")
 
+async def scheduler():
     while True:
-        try:
-            data = await fetch_data()
-            if data is None:
-                await send_message(bot, "❌ Не вдалося отримати дані з API.")
-                await asyncio.sleep(UPDATE_INTERVAL)
-                continue
+        await check_alerts()
+        await asyncio.sleep(CHECK_INTERVAL)
 
-            try:
-                current_alerts = parse_alerts(data)
-            except Exception as e:
-                await send_message(bot, f"❌ Помилка при перевірці тривог: {e}")
-                await asyncio.sleep(UPDATE_INTERVAL)
-                continue
 
-            # Порівняння зі старим станом
-            current_alerts_set = set(current_alerts)
-            previous_alerts_set = set(previous_state.get("alerts", []))
+@app.route("/")
+def home():
+    return "Air alert bot is running."
 
-            if current_alerts_set != previous_alerts_set:
-                if current_alerts:
-                    region_list = ", ".join(current_alerts)
-                    await send_message(bot, f"🚨 Повітряна тривога у: {region_list}")
-                else:
-                    await send_message(bot, "✅ Усі області без тривог.")
-                previous_state["alerts"] = current_alerts
 
-        except Exception as e:
-            logger.error(f"❌ Загальна помилка: {e}")
-            await send_message(bot, f"❌ Загальна помилка: {e}")
+def start():
+    loop = asyncio.get_event_loop()
+    loop.create_task(scheduler())
+    app.run(host="0.0.0.0", port=8000)
 
-        await asyncio.sleep(UPDATE_INTERVAL)
 
 if __name__ == "__main__":
-    asyncio.run(main_loop())
+    start()
