@@ -3,22 +3,17 @@ import time
 import requests
 from telegram import Bot
 
-# Читання змінних середовища
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
 bot = Bot(token=BOT_TOKEN)
 
-# Ініціалізація збереженого стану
 last_state = None
 
 def check_alerts():
     try:
-        url = "https://alerts.com.ua/api/states"
-        response = requests.get(url)
+        response = requests.get("https://alerts.com.ua/api/states")
         data = response.json()
-
-        # Отримати список областей, де тривога
         active = [region['name'] for region in data if region['alert']]
 
         if active:
@@ -37,4 +32,4 @@ while True:
     except Exception as e:
         print(f"Помилка при надсиланні повідомлення: {e}")
     
-    time.sleep(60)  # Чекати 60 сек перед новою перевіркою
+    time.sleep(60)
