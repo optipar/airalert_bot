@@ -15,10 +15,15 @@ def check_alerts():
         response = requests.get("https://alerts.com.ua/api/states")
         data = response.json()
 
-        if not isinstance(data, list):
-            return f"❌ Помилка при перевірці тривог: Очікувався список, але отримано {type(data).__name__}"
+        # Перевірка нової структури (dict замість list)
+        if isinstance(data, dict) and "states" in data:
+            states = data["states"]  # Це має бути список регіонів
+        elif isinstance(data, list):
+            states = data
+        else:
+            return f"❌ Помилка при перевірці тривог: Неочікувана структура даних: {type(data).__name__}"
 
-        active = [region['name'] for region in data if region.get('alert')]
+        active = [region['name'] for region in states if region.get('alert')]
         if active:
             return f"🚨 Повітряна тривога у: {', '.join(active)}"
         else:
