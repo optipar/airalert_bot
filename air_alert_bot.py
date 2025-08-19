@@ -25,13 +25,10 @@ def check_alerts():
 async def main():
     global last_state
     while True:
-        try:
-            message = check_alerts()
-            if message != last_state:
-                await bot.send_message(chat_id=CHAT_ID, text=message)
-                last_state = message
-        except Exception as e:
-            print(f"Помилка при надсиланні повідомлення: {e}")
+        message = check_alerts()
+        if message != last_state:
+            await bot.send_message(chat_id=CHAT_ID, text=message)
+            last_state = message
         await asyncio.sleep(60)
 
 if __name__ == "__main__":
